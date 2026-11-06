@@ -1,1 +1,240 @@
 
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>贪吃蛇小游戏</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;padding:20px;
+  background:#142238;color:white;
+  font-family:Arial,sans-serif;
+  text-align:center;
+}
+h1{color:#55e6a5}
+.info{display:flex;justify-content:center;gap:30px;margin:15px}
+canvas{
+  width:min(90vw,400px);
+  height:min(90vw,400px);
+  background:#20364c;
+  border:3px solid #55e6a5;
+  border-radius:10px;
+  touch-action:none;
+}
+button{
+  background:#28b77b;color:white;
+  border:0;border-radius:10px;
+  padding:12px 20px;margin:5px;
+  font-size:17px;
+}
+.pad{
+  display:grid;
+  grid-template-columns:repeat(3,65px);
+  gap:6px;justify-content:center;margin-top:15px;
+}
+.pad button{padding:12px 0;font-size:22px}
+.empty{visibility:hidden}
+</style>
+</head>
+<body>
+
+<h1>🐍 贪吃蛇</h1>
+
+<div class="info">
+  <div>得分：<b id="score">0</b></div>
+  <div>最高分：<b id="best">0</b></div>
+</div>
+
+<canvas id="game" width="400" height="400"></canvas>
+
+<p id="message">点击开始游戏！</p>
+
+<button onclick="startGame()">开始游戏</button>
+<button onclick="pauseGame()">暂停 / 继续</button>
+<button onclick="resetGame()">重新开始</button>
+
+<div class="pad">
+  <span class="empty"></span>
+  <button onclick="changeDir(0,-1)">⬆️</button>
+  <span class="empty"></span>
+  <button onclick="changeDir(-1,0)">⬅️</button>
+  <button onclick="changeDir(0,1)">⬇️</button>
+  <button onclick="changeDir(1,0)">➡️</button>
+</div>
+
+<p>电脑可用方向键或 WASD 控制，手机可点击方向按钮或滑动棋盘。</p>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const size=20;
+const count=20;
+
+let snake,food,dir,nextDir;
+let score=0,best=0;
+let timer=null,running=false,over=false;
+
+try{
+ best=Number(localStorage.getItem("snakeBest")||0);
+}catch(e){}
+document.getElementById("best").textContent=best;
+
+function resetGame(){
+ clearInterval(timer);
+ snake=[{x:8,y:10},{x:7,y:10},{x:6,y:10}];
+ dir={x:1,y:0};
+ nextDir={x:1,y:0};
+ score=0;running=false;over=false;
+ updateScore();
+ placeFood();
+ draw();
+ document.getElementById("message").textContent="准备好了吗？";
+}
+
+function placeFood(){
+ do{
+  food={
+   x:Math.floor(Math.random()*count),
+   y:Math.floor(Math.random()*count)
+  };
+ }while(snake.some(p=>p.x===food.x&&p.y===food.y));
+}
+
+function draw(){
+ ctx.clearRect(0,0,400,400);
+
+ ctx.strokeStyle="#ffffff12";
+ for(let i=0;i<=count;i++){
+  ctx.beginPath();
+  ctx.moveTo(i*size,0);
+  ctx.lineTo(i*size,400);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0,i*size);
+  ctx.lineTo(400,i*size);
+  ctx.stroke();
+ }
+
+ ctx.fillStyle="#ff647c";
+ ctx.beginPath();
+ ctx.arc(food.x*size+10,food.y*size+10,8,0,Math.PI*2);
+ ctx.fill();
+
+ snake.forEach((p,i)=>{
+  ctx.fillStyle=i===0?"#8affbd":"#25c887";
+  ctx.fillRect(p.x*size+2,p.y*size+2,16,16);
+ });
+}
+
+function tick(){
+ dir=nextDir;
+ const head={
+  x:snake[0].x+dir.x,
+  y:snake[0].y+dir.y
+ };
+
+ const eating=head.x===food.x&&head.y===food.y;
+ const body=eating?snake:snake.slice(0,-1);
+
+ if(
+  head.x<0||head.x>=count||
+  head.y<0||head.y>=count||
+  body.some(p=>p.x===head.x&&p.y===head.y)
+ ){
+  gameOver();
+  return;
+ }
+
+ snake.unshift(head);
+
+ if(eating){
+  score+=10;
+  updateScore();
+  placeFood();
+ }else{
+  snake.pop();
+ }
+
+ draw();
+}
+
+function updateScore(){
+ document.getElementById("score").textContent=score;
+ if(score>best){
+  best=score;
+  document.getElementById("best").textContent=best;
+  try{localStorage.setItem("snakeBest",best)}catch(e){}
+ }
+}
+
+function startGame(){
+ if(over)resetGame();
+ if(running)return;
+ running=true;
+ document.getElementById("message").textContent="游戏进行中！";
+ timer=setInterval(tick,130);
+}
+
+function pauseGame(){
+ if(running){
+  running=false;
+  clearInterval(timer);
+  document.getElementById("message").textContent="游戏已暂停";
+ }else if(!over){
+  startGame();
+ }
+}
+
+function gameOver(){
+ running=false;
+ over=true;
+ clearInterval(timer);
+ document.getElementById("message").textContent="游戏结束！得分："+score;
+}
+
+function changeDir(x,y){
+ if(x===-dir.x&&y===-dir.y)return;
+ nextDir={x,y};
+}
+
+document.addEventListener("keydown",e=>{
+ const keys={
+  ArrowUp:[0,-1],w:[0,-1],
+  ArrowDown:[0,1],s:[0,1],
+  ArrowLeft:[-1,0],a:[-1,0],
+  ArrowRight:[1,0],d:[1,0]
+ };
+ const k=keys[e.key]||keys[e.key.toLowerCase()];
+ if(k){
+  e.preventDefault();
+  changeDir(k[0],k[1]);
+ }
+});
+
+let touchStart=null;
+canvas.addEventListener("touchstart",e=>{
+ const t=e.changedTouches[0];
+ touchStart={x:t.clientX,y:t.clientY};
+},{passive:true});
+
+canvas.addEventListener("touchend",e=>{
+ if(!touchStart)return;
+ const t=e.changedTouches[0];
+ const dx=t.clientX-touchStart.x;
+ const dy=t.clientY-touchStart.y;
+ if(Math.max(Math.abs(dx),Math.abs(dy))>15){
+  if(Math.abs(dx)>Math.abs(dy))
+   changeDir(dx>0?1:-1,0);
+  else
+   changeDir(0,dy>0?1:-1);
+ }
+ touchStart=null;
+},{passive:true});
+
+resetGame();
+</script>
+</body>
+</html>
+
